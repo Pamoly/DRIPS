@@ -1,0 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #05070d;
+  color: #e2e8f0;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #24304a;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #35456a;
+  background-clip: content-box;
+}
+
+@layer components {
+  .panel {
+    @apply bg-ink-850 border border-ink-700/70 rounded-xl;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1;
+  }
+  .btn {
+    @apply inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-accent-500 text-ink-950 hover:bg-accent-400;
+  }
+  .btn-ghost {
+    @apply btn text-slate-300 hover:bg-ink-700/60 hover:text-white;
+  }
+  .btn-outline {
+    @apply btn border border-ink-600 text-slate-200 hover:border-accent-500/60 hover:text-white;
+  }
+  .btn-danger {
+    @apply btn bg-rose-500/90 text-white hover:bg-rose-500;
+  }
+  .tab {
+    @apply inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors;
+  }
+  .input {
+    @apply w-full rounded-lg border border-ink-600 bg-ink-900/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent-500/70 focus:outline-none;
+  }
+}
+
+/* Markdown produced by the assistant */
+.prose-drips {
+  @apply text-sm leading-relaxed text-slate-200;
+}
+.prose-drips h1,
+.prose-drips h2,
+.prose-drips h3,
+.prose-drips h4 {
+  @apply mt-4 mb-2 font-semibold text-white;
+}
+.prose-drips h1 {
+  @apply text-lg;
+}
+.prose-drips h2 {
+  @apply text-base;
+}
+.prose-drips h3 {
+  @apply text-sm uppercase tracking-wide text-accent-200;
+}
+.prose-drips p {
+  @apply my-2;
+}
+.prose-drips ul,
+.prose-drips ol {
+  @apply my-2 ml-5 list-disc space-y-1;
+}
+.prose-drips ol {
+  @apply list-decimal;
+}
+.prose-drips code {
+  @apply rounded bg-ink-900 px-1.5 py-0.5 font-mono text-[12.5px] text-accent-200;
+}
+.prose-drips pre {
+  @apply my-3 overflow-x-auto rounded-lg border border-ink-700 bg-ink-950 p-3;
+}
+.prose-drips pre code {
+  @apply bg-transparent p-0 text-[12.5px] text-slate-200;
+}
+.prose-drips table {
+  @apply my-3 w-full border-collapse text-left text-[13px];
+}
+.prose-drips th,
+.prose-drips td {
+  @apply border border-ink-700 px-2 py-1;
+}
+.prose-drips th {
+  @apply bg-ink-900 font-semibold text-slate-200;
+}
+.prose-drips a {
+  @apply text-accent-300 underline decoration-dotted;
+}
+.prose-drips blockquote {
+  @apply my-2 border-l-2 border-accent-500/60 pl-3 text-slate-300;
+}
+.prose-drips details {
+  @apply my-2 rounded-lg border border-ink-700 bg-ink-900/60 p-2;
+}
+.prose-drips summary {
+  @apply cursor-pointer text-xs uppercase tracking-wide text-accent-200;
+}
+
+/* Diff view */
+.diff-line {
+  @apply whitespace-pre-wrap break-words px-3 font-mono text-[12px] leading-5;
+}
+.diff-add {
+  @apply bg-emerald-500/10 text-emerald-200;
+}
+.diff-del {
+  @apply bg-rose-500/10 text-rose-200;
+}
+.diff-context {
+  @apply text-slate-400;
+}
+.diff-meta {
+  @apply bg-ink-800/80 text-accent-200;
+}
+
+/* Monaco needs a matching background or it flashes white while loading */
+.monaco-editor,
+.monaco-editor-background,
+.monaco-editor .margin {
+  background-color: #05070d !important;
+}
+
+.streaming-caret::after {
+  content: '▍';
+  margin-left: 2px;
+  animation: pulseSoft 1s steps(2, start) infinite;
+  color: #22d3ee;
+}
