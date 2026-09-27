@@ -107,13 +107,31 @@ class FileAnalysis(Serializable):
     summary: str = ""
     analyzed_at: float = field(default_factory=now)
     duration_ms: float = 0.0
-    revision: int = 0
+    revision: int = 1
 
     def severity_counts(self) -> dict[str, int]:
+        """Counts per severity. Tolerates raw dicts so a JSON round-trip cannot crash it."""
         counts = {"critical": 0, "major": 0, "minor": 0, "info": 0}
         for finding in self.findings:
-            counts[finding.severity] = counts.get(finding.severity, 0) + 1
+            severity = finding.severity if isinstance(finding, Finding) else finding.get("severity", "info")
+            counts[severity] = counts.get(severity, 0) + 1
         return counts
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "FileAnalysis":
+        """Rebuild a full object graph (findings and metrics included) from JSON."""
+        findings = [
+            Finding.from_dict(item) if isinstance(item, dict) else item
+            for item in payload.get("findings", [])
+        ]
+        raw_metrics = payload.get("metrics")
+        metrics = Metrics.from_dict(raw_metrics) if isinstance(raw_metrics, dict) else Metrics()
+        scalars = {
+            key: value
+            for key, value in payload.items()
+            if key in cls.__dataclass_fields__ and key not in {"findings", "metrics"}
+        }
+        return cls(findings=findings, metrics=metrics, **scalars)
 
 
 @dataclass

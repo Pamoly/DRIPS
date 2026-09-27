@@ -73,7 +73,9 @@ def main() -> int:
     check("it lists its endpoints", len(health.get("endpoints", [])) >= 20)
     check("the human-approval promise is stated", "human" in health.get("promise", "").lower())
 
-    print("\n2. The workspace loads with sample files")
+    print("\n2. The workspace loads with sample files (reset first, so the run is repeatable)")
+    status, _ = call("POST", "/api/workspace/reset")
+    check("the workspace can be restored to the samples", status == 200)
     status, workspace = call("GET", "/api/workspace")
     check("workspace payload arrives", status == 200)
     files = workspace.get("files", [])
@@ -82,6 +84,17 @@ def main() -> int:
 
     target = next((file for file in files if file["path"] == "inventory.py"), files[0])
     path = target["path"]
+
+    print("\n2b. The project dashboard rolls everything up")
+    status, overview = call("GET", "/api/health/overview")
+    check("the overview endpoint answers", status == 200, str(overview)[:120])
+    check("every file is rolled up", overview.get("files", 0) >= 1)
+    check("an average health is computed", overview.get("average_health") is not None)
+    check("severity totals are summed", sum(overview.get("severities", {}).values()) == overview.get("findings"))
+    check("hotspots are ranked worst first", (overview.get("hotspots") or [{}])[0].get("health_score", 100) <= (
+        overview.get("hotspots") or [{"health_score": 100}]
+    )[-1].get("health_score", 100))
+    check("cross-file duplication is checked", "duplicates" in overview)
 
     print("\n3. Reading code: the mentor explains a file")
     events = stream("Explain this file line by line, I am new to it", path)

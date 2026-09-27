@@ -284,6 +284,23 @@ class ReviewerTests(unittest.TestCase):
         self.assertFalse(result.data["blocking"])
 
 
+class SerialisationTests(unittest.TestCase):
+    """Findings must survive the JSON round trip, because the API serialises them."""
+
+    def test_analysis_round_trip_keeps_objects_not_dicts(self) -> None:
+        from backend.app.models import FileAnalysis
+
+        analysis = analyze_text(MESSY, "messy.py", "python")
+        restored = FileAnalysis.from_dict(analysis.to_dict())
+        self.assertEqual(len(restored.findings), len(analysis.findings))
+        self.assertIsInstance(restored.findings[0], type(analysis.findings[0]))
+        self.assertEqual(restored.severity_counts(), analysis.severity_counts())
+        self.assertEqual(restored.health_score, analysis.health_score)
+        self.assertEqual(restored.metrics.max_complexity, analysis.metrics.max_complexity)
+        # the dashboard reads severity_counts() on restored payloads, so this must not raise
+        self.assertEqual(sum(restored.severity_counts().values()), len(restored.findings))
+
+
 class RunnerTests(unittest.TestCase):
     def test_stdout_is_captured(self) -> None:
         result = runner.run_source("print(6 * 7)\n", "calc.py", "python")

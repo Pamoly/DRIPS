@@ -180,7 +180,7 @@ backend/   Python standard library only (no FastAPI, no dependencies)
    ├── learning/   levels, tracks, lessons — mapped to the rules you actually trip
    └── store.py    JSON-persisted workspace + append-only audit trail
 samples/   three files chosen to demonstrate every capability
-tests/     27 unit tests (unittest) + an 84-check end-to-end journey test
+tests/     28 unit tests (unittest) + a 91-check end-to-end journey test
 ```
 
 Full detail, including the security model and the extension points, is in
@@ -190,10 +190,13 @@ from the catalog into [`docs/RULES.md`](docs/RULES.md).
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests            # 27 unit tests, no server needed
+python3 -m unittest discover -s tests            # 28 unit tests, no server needed
 python3 -m backend.app.server --port 8000 &      # engine
-python3 tests/test_journey.py                    # 84 end-to-end checks
+python3 tests/test_journey.py                    # 91 end-to-end checks
 ```
+
+New here? [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) is a five-minute guided tour of a
+single file, from reading it to reviewing the fix.
 
 The journey test walks the product the way a person does — read, diagnose, propose,
 approve, apply, revert, run, review, audit — and asserts the promises, including that
@@ -201,7 +204,7 @@ approve, apply, revert, run, review, audit — and asserts the promises, includi
 applied**.
 
 ```
-84/84 checks passed
+91/91 checks passed
 The whole loop works: read → diagnose → propose → approve → apply → revert → review.
 ```
 
