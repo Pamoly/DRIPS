@@ -215,6 +215,52 @@ class TeacherTests(unittest.TestCase):
         self.assertIn("returns", result.markdown.lower())
 
 
+class ChatAgentTests(unittest.TestCase):
+    """The mentor must answer about *your* code, not with a generic card."""
+
+    def setUp(self) -> None:
+        self.source = Path("samples/inventory.py").read_text(encoding="utf-8")
+        self.analysis = analyze_text(self.source, "inventory.py", "python")
+
+    def ask(self, question: str):
+        from backend.app.agents.chat import chat_agent
+
+        return chat_agent.run(
+            AgentContext(
+                file_path="inventory.py",
+                source=self.source,
+                language="python",
+                analysis=self.analysis,
+                question=question,
+            )
+        )
+
+    def test_naming_a_function_answers_about_that_function(self) -> None:
+        result = self.ask("why is load_cart dangerous?")
+        self.assertIn("load_cart", result.headline)
+        self.assertIn("line 32", result.markdown)
+        self.assertIn("statement by statement", result.markdown)
+        self.assertIn("Problems inside it", result.markdown)
+        # it quotes the real problem in that function, with the fix
+        self.assertIn("Mutable default argument", result.markdown)
+
+    def test_concept_question_gets_a_grounded_lesson(self) -> None:
+        result = self.ask("what is a mutable default argument?")
+        self.assertIn("mutable trap", result.headline.lower())
+        self.assertIn("None", result.markdown)
+        self.assertIn("Try it now", result.markdown)
+
+    def test_unknown_question_admits_it_and_offers_what_it_can_do(self) -> None:
+        result = self.ask("tell me something random about the weather")
+        self.assertIn("one more clue", result.markdown)
+        self.assertTrue(result.follow_ups)
+
+    def test_every_answer_says_where_it_came_from(self) -> None:
+        result = self.ask("how do I handle errors?")
+        self.assertEqual(result.data["provider"], "offline")
+        self.assertTrue(result.data["grounded"])
+
+
 class DebuggerTests(unittest.TestCase):
     TRACEBACK = (
         "Traceback (most recent call last):\n"

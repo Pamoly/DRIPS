@@ -8,6 +8,7 @@ from this module and from the analyser — so the mentor cannot invent a finding
 
 from __future__ import annotations
 
+import ast
 import re
 
 from .base import Agent, AgentContext, AgentResult
@@ -55,6 +56,41 @@ TOPICS: dict[str, dict] = {
         "pitfall": "A bare `except:` (or `except: pass`) hides typos, `KeyboardInterrupt` and real bugs. Catch the specific error you can actually handle.",
         "example": "```python\ntry:\n    quantity = int(raw)\nexcept ValueError:\n    quantity = 0          # documented fallback\n```",
         "try_it": "Rewrite a bare except in this workspace, and say what the caller sees after the change.",
+    },
+    "default argument": {
+        "title": "Default arguments (and the mutable trap)",
+        "what": "A default makes a parameter optional: `def f(items=[])`. Python evaluates that default **once**, when the `def` line runs — not on every call.",
+        "pitfall": "Because there is only one list object, values appended during one call are still there on the next call. This is the single most common 'why does my function remember?' bug, and it is silent.",
+        "example": "```python\ndef add_item(item, basket=None):      # None is the safe default\n    if basket is None:\n        basket = []                  # fresh list per call\n    basket.append(item)\n    return basket\n```",
+        "try_it": "Find a `=[]` or `={}` default in this workspace and rewrite it with the `None` sentinel.",
+    },
+    "mutation": {
+        "title": "Mutation and side effects",
+        "what": "Mutating means changing an object in place (`items.append(x)`, `record['k'] = v`). Every other holder of that object sees the change.",
+        "pitfall": "A function that mutates its argument has an invisible output: the caller's variable changes, and nothing in the signature said so. Shared state then makes bugs depend on call order.",
+        "example": "```python\ndef with_tax(items):\n    return [*items, tax]        # new list — the caller's data is untouched\n```",
+        "try_it": "Look for `.append(`/`.update(` inside a function that receives a list or dict, and decide whether the caller knows.",
+    },
+    "duplication": {
+        "title": "Duplicated code",
+        "what": "Two blocks that are nearly identical. They are cheap to write and expensive to own.",
+        "pitfall": "Every copy has to be fixed separately, so sooner or later one is forgotten — and the two copies then disagree about the truth. Reviewers stop reading carefully when a diff is mostly repetition.",
+        "example": "```python\ndef line_total(item):              # written once\n    return item[\"price\"] * item[\"quantity\"]\n\ntotal = sum(line_total(item) for item in cart)\n```",
+        "try_it": "Run the project overview and look for cross-file clones; extract the shared block into one function and call it twice.",
+    },
+    "naming": {
+        "title": "Naming",
+        "what": "A name is the cheapest documentation you will ever write. It should say what the value *means*, not what type it is.",
+        "pitfall": "Names like `data`, `temp`, `process()`, `handle2` force the reader to reverse-engineer the intent from the body — which is exactly what you were trying to avoid.",
+        "example": "```python\nnet_total = subtotal - discount      # the name answers \"which total?\"\n```",
+        "try_it": "Find one variable in this file whose name would not survive a code review, and rename it.",
+    },
+    "side effect": {
+        "title": "Side effects",
+        "what": "A side effect is anything a function does beyond returning a value: printing, writing a file, calling the network, mutating an argument.",
+        "pitfall": "Side effects are what make functions hard to test and impossible to reason about in isolation. A function whose name is a noun ('receipt') should probably not write files.",
+        "example": "```python\ndef build_receipt(cart) -> str:      # pure: same input, same output\n    return NEWLINE.join(line(item) for item in cart)\n```".replace("NEWLINE", "chr(10)"),
+        "try_it": "List every side effect in the active file, then ask which of them the caller would be surprised by.",
     },
     "none": {
         "title": "None / null / undefined",
@@ -115,6 +151,11 @@ SYNONYMS = {
     "dictionary": ["dict", "dictionary", "hash", "map", "key", "json", "object"],
     "error": ["error", "exception", "try", "except", "catch", "finally", "raise", "throw"],
     "none": ["none", "null", "undefined", "optional", "missing"],
+    "default argument": ["mutable default", "default argument", "default value", "defaults", "default parameter"],
+    "mutation": ["mutation", "mutations", "mutate", "mutating", "mutates", "in place", "in-place", "append", "reference"],
+    "side effect": ["side effect", "side effects", "side-effect", "side-effects", "pure function", "impure", "stateful"],
+    "duplication": ["duplicate", "duplication", "clone", "copy-paste", "copy paste", "repeated code", "dry"],
+    "naming": ["naming", "name", "rename", "readable", "readability", "too short"],
     "test": ["test", "pytest", "vitest", "jest", "assert", "coverage"],
     "complexity": ["complexity", "cyclomatic", "nesting", "refactor", "long function"],
     "security": ["security", "sql", "injection", "secret", "xss", "eval", "password"],
@@ -132,12 +173,13 @@ class ChatAgent(Agent):
     def run(self, context: AgentContext) -> AgentResult:
         question = (context.question or "").strip()
         topics = self._match_topics(question)
-        offline = self._offline_answer(context, question, topics)
+        symbol = self._target_symbol(context, question)
+        offline = self._offline_answer(context, question, topics, symbol)
         answer, provider = self._maybe_upgrade(context, question, offline)
 
         return AgentResult(
             agent=self.name,
-            headline=self._headline(question, topics),
+            headline=self._headline(question, topics, symbol),
             markdown=answer,
             data={
                 "topics": [topic["title"] for topic in topics],
@@ -154,14 +196,18 @@ class ChatAgent(Agent):
         lowered = question.lower()
         scored: list[tuple[int, dict]] = []
         for key, synonyms in SYNONYMS.items():
-            score = sum(1 for synonym in synonyms if re.search(rf"\b{re.escape(synonym)}\b", lowered))
+            score = sum(
+                1 for synonym in synonyms if re.search(rf"\b{re.escape(synonym)}(?:s|es|ing)?\b", lowered)
+            )
             if score:
                 scored.append((score, TOPICS[key]))
         scored.sort(key=lambda item: item[0], reverse=True)
         return [topic for _, topic in scored[:3]]
 
-    def _offline_answer(self, context: AgentContext, question: str, topics: list[dict]) -> str:
+    def _offline_answer(self, context: AgentContext, question: str, topics: list[dict], symbol: str | None = None) -> str:
         parts: list[str] = []
+        if symbol:
+            parts.append(self._describe_symbol(context, symbol))
         if topics:
             main = topics[0]
             parts.append(f"## {main['title']}\n{main['what']}")
@@ -177,6 +223,8 @@ class ChatAgent(Agent):
                     "### Related\n"
                     + self.bullet([f"**{topic['title']}** — {topic['what'].split('.')[0]}." for topic in topics[1:]])
                 )
+        elif symbol:
+            pass  # already answered above, from the source itself
         else:
             parts.append(
                 "## I need one more clue\n"
@@ -202,6 +250,126 @@ class ChatAgent(Agent):
                     f"{worst.why_it_matters} Ask me to fix it and I will prepare the patch."
                 )
         return "\n\n".join(parts)
+
+    def _target_symbol(self, context: AgentContext, question: str) -> str | None:
+        """Find a function or class in the file that the question names.
+
+        "Why is `load_cart` dangerous?" should be answered about *that* function, from the
+        source, not with a generic concept card.
+        """
+        if not question:
+            return None
+        named = set(re.findall(r"[`'\"]([A-Za-z_][\w]*)[`'\"]|\b([a-z_][a-z0-9_]{3,})\b", question))
+        candidates = {first or second for first, second in named}
+        symbols = self._symbols(context)
+        for name in symbols:
+            if name in candidates:
+                return name
+        return None
+
+    def _symbols(self, context: AgentContext) -> dict[str, dict]:
+        """Functions and classes in the file, with their line range and outline."""
+        symbols: dict[str, dict] = {}
+        if context.language == "python":
+            try:
+                tree = ast.parse(context.source)
+            except SyntaxError:
+                return symbols
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    symbols[node.name] = {
+                        "kind": "class" if isinstance(node, ast.ClassDef) else "function",
+                        "line": node.lineno,
+                        "end_line": getattr(node, "end_lineno", node.lineno),
+                        "docstring": ast.get_docstring(node) or "",
+                        "params": [a.arg for a in getattr(node, "args", ast.arguments([], [], None, [], [], None, [])).args],
+                        "outline": self._outline(node),
+                        "node": node,
+                    }
+            return symbols
+        from .teacher import _js_blocks
+
+        for block in _js_blocks(context):
+            symbols[block["name"]] = {
+                "kind": "function",
+                "line": block["line"],
+                "end_line": block["end_line"],
+                "docstring": "",
+                "params": [p.strip() for p in block["params_raw"].split(",") if p.strip()],
+                "outline": [
+                    line.strip()
+                    for line in block["body"].splitlines()
+                    if line.strip() and not line.strip().startswith(("//", "/*", "*"))
+                ][:8],
+                "node": None,
+            }
+        return symbols
+
+    @staticmethod
+    def _outline(node: ast.AST) -> list[str]:
+        """One short line per top-level statement — the shape of the function at a glance."""
+        steps: list[str] = []
+        for statement in getattr(node, "body", []):
+            if isinstance(statement, ast.AST) and hasattr(ast, "unparse"):
+                text = ast.unparse(statement).splitlines()[0].strip()
+                if len(text) > 96:
+                    text = text[:93] + "…"
+                steps.append(text)
+        return steps[:10]
+
+    def _describe_symbol(self, context: AgentContext, name: str) -> str:
+        symbol = self._symbols(context).get(name)
+        if not symbol:
+            return ""
+        findings = [
+            finding
+            for finding in context.findings()
+            if symbol["line"] <= finding.line <= symbol["end_line"]
+        ]
+        complexity = ""
+        if context.analysis:
+            for function in context.analysis.metrics.extra.get("functions", []):
+                if function.get("name", "").split(".")[-1] == name:
+                    complexity = (
+                        f"\n**Cost to read:** cyclomatic complexity {function['complexity']}, "
+                        f"{function['length']} lines, {function['nesting']} level(s) of nesting."
+                    )
+                    break
+
+        lines = [
+            f"## `{name}` — {symbol['kind']} at line {symbol['line']}",
+            f"**Inputs:** " + (", ".join(f"`{p}`" for p in symbol["params"]) or "*none*")
+            + f"  ·  **Body:** lines {symbol['line']}–{symbol['end_line']}",
+        ]
+        if symbol["docstring"]:
+            lines.append(f"**The author says:** “{symbol['docstring'].strip().splitlines()[0]}”")
+        else:
+            lines.append(
+                "**No docstring**, so the name carries the whole promise. Ask yourself: could you rename this "
+                "function without lying?"
+            )
+        if symbol["outline"]:
+            steps = "\n".join(f"{index}. `{step}`" for index, step in enumerate(symbol["outline"][:8], start=1))
+            lines.append(f"### What it actually does, statement by statement\n{steps}")
+        if complexity:
+            lines.append(complexity.strip())
+
+        if findings:
+            rows = ["### Problems inside it"]
+            for finding in findings[:4]:
+                rows.append(
+                    f"- {self.severity_icon(finding.severity)} **{finding.title}** (line {finding.line}) — "
+                    f"{finding.why_it_matters} *Fix:* {finding.how_to_fix}"
+                )
+            lines.append("\n".join(rows))
+        else:
+            lines.append("### Problems inside it\nNone found by the static rules — the risk here is design, not syntax.")
+        lines.append(
+            "### Check your understanding\n"
+            f"Cover the body and predict what `{name}` returns for the smallest realistic input, then run it. "
+            "If your prediction and the output disagree, that gap is the thing to learn next."
+        )
+        return "\n\n".join(lines)
 
     def _usage_in_file(self, context: AgentContext, topic_title: str) -> str:
         signals = {
@@ -255,7 +423,9 @@ class ChatAgent(Agent):
                 lines.append(f"- [{finding.severity}] line {finding.line}: {finding.title} — {finding.message}")
         return "\n".join(lines)
 
-    def _headline(self, question: str, topics: list[dict]) -> str:
+    def _headline(self, question: str, topics: list[dict], symbol: str | None = None) -> str:
+        if symbol:
+            return f"`{symbol}` — read from your source, with the problems inside it"
         if topics:
             return f"{topics[0]['title']} — explained with an example from your code"
         return "Let me point you at what I can do precisely"

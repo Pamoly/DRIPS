@@ -157,6 +157,15 @@ The stream is server-sent events over `POST /api/chat/stream`, so the plan, the 
 trace, the findings, the patches and the final answer all appear as they happen — and you
 can read *how* a senior engineer approaches the file, not just the conclusion.
 
+Free-form questions are grounded in your file, not in generic advice:
+
+| you ask | you get |
+|---|---|
+| “why is `load_cart` dangerous?” | that function's signature, its statement-by-statement outline, the findings inside it with the fix for each, and a question to test yourself |
+| “what is a mutable default argument?” | the concept, the pitfall, a corrected example, and where your file trips it |
+| “how do I handle errors?” | the topic card plus the exact line in your file that shows it |
+| something it cannot ground | an honest “I need one more clue” with the questions it *can* answer precisely |
+
 ## Autonomy levels
 
 | mode | the agents may | you must |
@@ -180,7 +189,7 @@ backend/   Python standard library only (no FastAPI, no dependencies)
    ├── learning/   levels, tracks, lessons — mapped to the rules you actually trip
    └── store.py    JSON-persisted workspace + append-only audit trail
 samples/   three files chosen to demonstrate every capability
-tests/     28 unit tests (unittest) + a 91-check end-to-end journey test
+tests/     32 unit tests (unittest) + a 91-check end-to-end journey test
 ```
 
 Full detail, including the security model and the extension points, is in
@@ -190,7 +199,7 @@ from the catalog into [`docs/RULES.md`](docs/RULES.md).
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests            # 28 unit tests, no server needed
+python3 -m unittest discover -s tests            # 32 unit tests, no server needed
 python3 -m backend.app.server --port 8000 &      # engine
 python3 tests/test_journey.py                    # 91 end-to-end checks
 ```
