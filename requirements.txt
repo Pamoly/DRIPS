@@ -1,0 +1,19 @@
+# DRIPS has no required dependencies.
+#
+# The engine is written against the Python standard library only, so it starts with:
+#
+#     python3 -m backend.app.server --port 8000
+#
+# Everything below is OPTIONAL. Install a line only if you want that capability.
+#
+# 1. Large-language-model narration (the mentor explains things in a warmer voice and
+#    can answer open-ended questions). The deterministic engine keeps working either
+#    way, and findings/patches/scores never come from the model:
+#
+#    export OPENAI_API_KEY=...        # or ANTHROPIC_API_KEY=...
+#
+# 2. Development tooling:
+#
+# pytest>=8.0          # not required: the test suite runs on unittest
+# ruff>=0.6            # linting
+# mypy>=1.11           # type checking
