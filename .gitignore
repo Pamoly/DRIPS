@@ -1,0 +1,42 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# build output
+client/dist/
+dist/
+build/
+*.tsbuildinfo
+
+# runtime data — the JSON store is created by `npm run seed` / the demo loader
+server/data/
+*.sqlite
+*.db
+
+# logs & debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# editors & OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# environment
+.env
+.env.*
+!.env.example
+
+# caches
+.cache/
+.vite/
+.eslintcache
+coverage/
