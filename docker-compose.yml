@@ -1,0 +1,23 @@
+services:
+  drips:
+    build: .
+    container_name: drips-seo
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # Replace with a long random string in real deployments (signs session cookies).
+      DRIPS_SECRET: "change-me-in-production"
+      # Set to "true" when serving exclusively over HTTPS.
+      DRIPS_SECURE_COOKIES: "false"
+    volumes:
+      # Persists the JSON workspace data across container restarts.
+      - ./docker-data:/app/.data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

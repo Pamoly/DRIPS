@@ -1,0 +1,32 @@
+# systemd unit for hosting DRIPS on a Linux VM.
+# sudo cp deploy/drips.service /etc/systemd/system/drips.service
+# sudo systemctl daemon-reload && sudo systemctl enable --now drips
+
+[Unit]
+Description=DRIPS SEO Intelligence Platform
+After=network.target
+
+[Service]
+Type=simple
+User=drips
+Group=drips
+WorkingDirectory=/opt/drips
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=DRIPS_SECURE_COOKIES=true
+EnvironmentFile=-/opt/drips/.env.local
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/drips/.data
+
+[Install]
+WantedBy=multi-user.target
